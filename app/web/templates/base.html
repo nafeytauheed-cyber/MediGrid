@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} - MediGrid</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/control">MediGrid</a>
+  <nav>
+    <a href="/control">Control room</a>
+    <a href="/dispatch">Dispatch</a>
+    <a href="/hospital">Hospital console</a>
+    <a href="/ops">Operations</a>
+  </nav>
+  <div class="top-right">
+    <span id="mode-badge" class="badge" role="status" aria-live="polite">Mode: ...</span>
+    <span id="conn" class="conn" role="status" aria-live="polite"><span class="conn-shape" aria-hidden="true"></span><span id="conn-text">Connecting</span></span>
+    <button id="ident-btn" type="button" class="btn-small">{% if ident %}{{ ident.role }}: {{ ident.user_id }}{% if ident.hospital_id %} ({{ ident.hospital_id }}){% endif %}{% else %}Choose demo identity{% endif %}</button>
+  </div>
+</header>
+<div id="banner" class="banner" role="alert" hidden></div>
+<dialog id="ident-dialog">
+  <form id="ident-form" method="dialog">
+    <h2>Demo identity</h2>
+    <p class="muted">No passwords. Identity is stored in a signed cookie shared by both instances.</p>
+    <label>Role
+      <select name="role" id="ident-role">
+        <option value="dispatcher">Dispatcher</option>
+        <option value="hospital">Hospital staff</option>
+        <option value="operator">Operator</option>
+      </select>
+    </label>
+    <label>User id <input name="user_id" id="ident-user" required maxlength="40" value="{{ ident.user_id if ident else 'user-1' }}"></label>
+    <label>Hospital (staff only) <select name="hospital_id" id="ident-hosp"></select></label>
+    <div class="row"><button type="submit" class="btn-primary">Save</button><button type="button" id="ident-cancel">Cancel</button></div>
+  </form>
+</dialog>
+<main id="main" class="{{ main_class|default('') }}">
+{% block body %}{% endblock %}
+</main>
+<footer class="foot">Synthetic data. Instance: <span id="inst">{{ instance }}</span></footer>
+<script>window.MG = {ident: {{ (ident or {})|tojson }}, chaos: {{ chaos|tojson }}};</script>
+<script src="/static/common.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

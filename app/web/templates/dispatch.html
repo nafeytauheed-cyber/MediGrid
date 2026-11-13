@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Dispatch: MediGrid SmartMatch</h1>
+<p class="muted small">SmartMatch is a deterministic rule filter on synthetic capability tags. It is not diagnosis, triage or medical advice.
+Trained dispatchers follow local clinical escalation protocols.</p>
+<div class="grid2">
+  <section class="panel">
+    <h2>Request</h2>
+    <form id="req" autocomplete="off">
+      <div class="grid3">
+        <label>Synthetic patient condition <select id="condition" required></select></label>
+        <label>Bed type <select id="bed_type" required></select></label>
+        <label>Priority <select id="priority"><option value="4">4 critical</option><option value="3">3 urgent</option><option value="2" selected>2 standard</option><option value="1">1 routine</option></select></label>
+        <label>Patient id <input id="patient_id" required maxlength="48"></label>
+        <label>Ambulance id <input id="ambulance_id" required maxlength="48" value="AMB-01"></label>
+        <label>Radius km <input id="radius" type="number" min="1" max="150" step="1" value="50"></label>
+        <label>Latitude <input id="lat" type="number" step="0.0001" required></label>
+        <label>Longitude <input id="lon" type="number" step="0.0001" required></label>
+      </div>
+      <p id="req-caps" class="small"></p>
+      <div class="row">
+        <button type="button" id="btn-search">Search (no hold)</button>
+        <button type="submit" class="btn-primary" id="btn-reserve">Reserve nearest suitable bed</button>
+        <span class="muted small">Radius above 50 km needs an operator identity (operator-reviewed expansion).</span>
+      </div>
+    </form>
+  </section>
+  <section class="panel" aria-live="polite" id="result">
+    <h2>Hold</h2>
+    <p class="muted">No hold yet.</p>
+  </section>
+</div>
+<section class="panel" aria-live="polite">
+  <h2>SmartMatch rationale</h2>
+  <div id="rationale"><p class="muted">Run a search or a reservation to see matched and excluded hospitals.</p></div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/dispatch.js"></script>{% endblock %}

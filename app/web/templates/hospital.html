@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block body %}
+<h1 id="h-title">Hospital {{ hospital_id }}</h1>
+<div id="caps" class="caps" aria-label="Verified capabilities"></div>
+<div id="incoming" aria-live="assertive"></div>
+<div class="grid2">
+  <section class="panel">
+    <div class="toolbar">
+      <label>Show
+        <select id="f-type"><option value="ALL">All types</option><option value="ICU">ICU</option><option value="VENTILATOR">VENT</option><option value="GENERAL">GEN</option></select>
+      </label>
+      <label>Status
+        <select id="f-status"><option value="ALL">All</option><option value="FREE">FREE</option><option value="RESERVED">RESERVED</option><option value="OCCUPIED">OCCUPIED</option></select>
+      </label>
+      <span class="small muted">Keys: arrows move, <span class="kbd">A</span> admit, <span class="kbd">D</span> discharge, <span class="kbd">T</span> transfer, <span class="kbd">C</span> confirm arrival, <span class="kbd">Enter</span> actions</span>
+    </div>
+    <p id="summary" class="small" aria-live="polite"></p>
+    <div id="grid" class="bedgrid" role="listbox" tabindex="0" aria-label="Beds"></div>
+  </section>
+  <section>
+    <div class="panel actions" id="act" aria-live="polite"><h2>Selected bed</h2><p class="muted">Select a bed.</p></div>
+    <div class="panel"><h2>Transfers</h2><div id="transfers"><p class="muted">None.</p></div></div>
+    <div class="panel"><h2>Notifications</h2><ul id="notes" class="small"></ul></div>
+  </section>
+</div>
+<dialog id="tx-dialog">
+  <form id="tx-form" method="dialog">
+    <h2>Transfer patient</h2>
+    <p id="tx-from" class="small"></p>
+    <label>Synthetic condition <select id="tx-cond"></select></label>
+    <label>Bed type at destination <select id="tx-type"></select></label>
+    <label>Destination (only hospitals with the required capabilities) <select id="tx-to"></select></label>
+    <label>Priority <select id="tx-prio"><option value="4">4 critical</option><option value="3">3 urgent</option><option value="2">2 standard</option><option value="1">1 routine</option></select></label>
+    <div class="row"><button type="submit" class="btn-primary">Request transfer</button><button type="button" id="tx-cancel">Cancel</button></div>
+  </form>
+</dialog>
+<script>window.HOSPITAL_ID = {{ hospital_id|tojson }};</script>
+{% endblock %}
+{% block scripts %}<script src="/static/hospital.js"></script>{% endblock %}

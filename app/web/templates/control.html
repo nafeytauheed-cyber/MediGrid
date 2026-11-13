@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Control room</h1>
+<div class="grid2">
+  <section class="panel" aria-labelledby="map-h">
+    <h2 id="map-h">City map</h2>
+    <div class="filters" role="group" aria-label="Map filters">
+      <label>Bed type
+        <select id="f-type"><option value="ALL">All types</option><option value="ICU">ICU</option><option value="VENTILATOR">VENT</option><option value="GENERAL">GEN</option></select>
+      </label>
+      <label>Load status
+        <select id="f-status"><option value="ALL">All</option><option value="OK">OK</option><option value="LOW">LOW</option><option value="FULL">FULL</option></select>
+      </label>
+      <label>Specialty capability
+        <select id="f-cap"><option value="ALL">Any</option></select>
+      </label>
+      <label><input type="checkbox" id="f-amb" checked> Ambulances (simulator)</label>
+    </div>
+    <div class="map-wrap">
+      <svg id="map" viewBox="0 0 900 640" role="group" aria-label="Hospitals on a schematic city map. Use Tab to move between hospitals and Enter to open details."></svg>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="#2f6b3a"/></svg> OK (more than 3 free)</span>
+      <span><svg width="14" height="14"><polygon points="7,1 13,13 1,13" fill="#8a5a00"/></svg> LOW (1 to 3 free)</span>
+      <span><svg width="14" height="14"><rect x="1" y="1" width="12" height="12" fill="#7a2630"/></svg> FULL (0 free)</span>
+      <span><svg width="14" height="14"><rect x="3" y="3" width="8" height="8" fill="#1b1f24" transform="rotate(45 7 7)"/></svg> Ambulance (from simulator process)</span>
+      <span class="muted">Label shows hospital id and free count for the selected type.</span>
+    </div>
+    <p id="amb-status" class="muted small"></p>
+  </section>
+  <section>
+    <div class="panel" aria-live="polite">
+      <h2>City totals</h2>
+      <table><thead><tr><th>Type</th><th class="num">Free</th><th class="num">Reserved</th><th class="num">Occupied</th></tr></thead>
+        <tbody id="totals"></tbody></table>
+      <p class="muted small" id="last-update"></p>
+    </div>
+    <div class="panel" id="detail"><h2>Hospital detail</h2><p class="muted">Select a hospital on the map or in the table.</p></div>
+  </section>
+</div>
+<section class="panel">
+  <h2>All hospitals</h2>
+  <table><thead><tr><th>Hospital</th><th>Status</th><th class="num">ICU free</th><th class="num">VENT free</th><th class="num">GEN free</th><th>Capabilities</th></tr></thead>
+    <tbody id="htable"></tbody></table>
+</section>
+{% endblock %}
+{% block scripts %}<script src="/static/control.js"></script>{% endblock %}
