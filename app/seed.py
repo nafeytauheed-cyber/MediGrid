@@ -123,7 +123,7 @@ def seed(conn, rng_rows):
                    SELECT hospital_id, bed_type, COUNT(*) FILTER (WHERE status='FREE'),
                           COUNT(*) FILTER (WHERE status='RESERVED'), COUNT(*) FILTER (WHERE status='OCCUPIED')
                    FROM beds GROUP BY hospital_id, bed_type""")
-    cur.execute("UPDATE system_state SET value=value+1 WHERE key='pg_epoch'")
+    cur.execute("SELECT nextval('pg_epoch_seq')")
     cur.execute("UPDATE system_state SET value=0 WHERE key IN ('cache_state','ttl_override_s')")
     return len(rows), len(bed_rows), len(patients)
 

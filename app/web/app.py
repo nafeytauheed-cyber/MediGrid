@@ -351,7 +351,7 @@ def create_app():
         _chaos_guard()
         b = body()
         key = str(b.get("key", ""))
-        allowed = ("fault:poison", "fault:crash_after_hold", "fault:ambiguous_commit") + tuple(
+        allowed = ("fault:poison", "fault:crash_after_hold", "fault:ambiguous_commit", "fault:force_sql") + tuple(
             f"pause:{q}" for q, _b, _p in mq.GROUPS.values())
         if key not in allowed:
             raise ApiError(400, {"error": "UNKNOWN_FLAG", "allowed": allowed})

@@ -23,12 +23,18 @@ def pool():
     if _pool is None:
         with _pool_lock:
             if _pool is None:
+                # autocommit: a single read is one round trip; transactions use explicit conn.transaction().
+                # Default timeouts are set once per connection instead of SET LOCAL per transaction.
+                # No per-checkout health check: it costs a round trip on every use (about 1 ms here).
                 _pool = ConnectionPool(
-                    config.PG_DSN, min_size=2, max_size=config.PG_POOL_MAX, timeout=5.0,
-                    kwargs={"row_factory": dict_row, "autocommit": False}, open=True,
-                    check=ConnectionPool.check_connection,
+                    config.PG_DSN, min_size=min(8, config.PG_POOL_MAX), max_size=config.PG_POOL_MAX, timeout=5.0,
+                    kwargs={"row_factory": dict_row, "autocommit": True}, open=True, configure=_configure,
                 )
     return _pool
+
+
+def _configure(conn):
+    conn.execute("SET lock_timeout = '2s'; SET statement_timeout = '5s'")
 
 
 class Conflict(Exception):
@@ -49,8 +55,9 @@ def run_tx(fn, attempts=4, lock_timeout="2s", statement_timeout="5s"):
             with pool().connection() as conn:
                 with conn.transaction():
                     with conn.cursor() as cur:
-                        cur.execute(f"SET LOCAL lock_timeout = '{lock_timeout}'")
-                        cur.execute(f"SET LOCAL statement_timeout = '{statement_timeout}'")
+                        if lock_timeout != "2s" or statement_timeout != "5s":
+                            cur.execute(f"SET LOCAL lock_timeout = '{lock_timeout}'; "
+                                        f"SET LOCAL statement_timeout = '{statement_timeout}'")
                         return fn(cur)
         except RETRYABLE as e:
             last = e
@@ -62,9 +69,7 @@ def query(sql, params=None):
     with pool().connection() as conn:
         with conn.cursor() as cur:
             cur.execute(sql, params)
-            rows = cur.fetchall() if cur.description else []
-        conn.commit()
-        return rows
+            return cur.fetchall() if cur.description else []
 
 
 def query_one(sql, params=None):
@@ -78,11 +83,19 @@ def get_state(cur, key):
     return r["value"] if r else None
 
 
+EPOCH_FENCE = 4243
+
+
 def bump_epoch(cur):
-    """Last statement of every availability-changing transaction: serialises with the
-    fenced cache switch (see cache.py) and acts as the change watermark."""
-    cur.execute("UPDATE system_state SET value = value + 1 WHERE key='pg_epoch' RETURNING value")
-    return cur.fetchone()["value"]
+    """Last statement of every availability-changing transaction. The shared advisory lock is held until commit,
+    so the fenced cache switch (exclusive lock, cache.py) waits for in-flight writers and blocks new ones while it
+    re-reads PostgreSQL. Writers do not block each other. The sequence is the change watermark."""
+    cur.execute("SELECT pg_advisory_xact_lock_shared(%s), nextval('pg_epoch_seq') AS v", (EPOCH_FENCE,))
+    return cur.fetchone()["v"]
+
+
+def read_epoch():
+    return query_one("SELECT last_value AS v FROM pg_epoch_seq")["v"]
 
 
 def next_patient_seq(cur, patient_id):
@@ -91,28 +104,43 @@ def next_patient_seq(cur, patient_id):
     return cur.fetchone()["last_seq_no"]
 
 
-def add_event(cur, etype, data, patient_id=None, priority=2, correlation_id=None, flags=None):
+def add_event(cur, etype, data, patient_id=None, priority=2, correlation_id=None, flags=None, patient_set=None):
     """Insert one outbox row in the caller's transaction. Patient events get the next
-    per-patient sequence number. pg_notify wakes the outbox publisher at commit."""
+    per-patient sequence number. No NOTIFY here: NOTIFY takes a global lock across the commit flush and
+    serialises all committing transactions (measured, BUILD_LOG); the publisher polls the pending index instead."""
     event_id = str(uuid.uuid4())
-    seq = next_patient_seq(cur, patient_id) if patient_id else None
     envelope = {
         "event_id": event_id,
         "type": etype,
         "patient_id": patient_id,
-        "patient_seq_no": seq,
+        "patient_seq_no": None,
         "correlation_id": correlation_id or event_id,
         "occurred_at": None,
         "priority": priority,
         "data": data,
         "flags": flags or {},
     }
-    cur.execute(
-        "INSERT INTO outbox_events (event_id, routing_key, priority, payload) "
-        "VALUES (%s, %s, %s, jsonb_set(%s::jsonb, '{occurred_at}', to_jsonb(clock_timestamp())))",
-        (event_id, etype, priority, json.dumps(envelope)),
-    )
-    cur.execute("SELECT pg_notify('outbox', '')")
+    if patient_id:
+        # one round trip: bump the patient's sequence (optionally set state fields) and insert the outbox row
+        sets, args = "", []
+        for k, v in (patient_set or {}).items():
+            assert k in ("state", "current_bed_id", "current_hosp_id")
+            sets += f", {k} = %s"
+            args.append(v)
+        cur.execute(
+            f"WITH p AS (UPDATE patients SET last_seq_no = last_seq_no + 1, updated_at = NOW(){sets} "
+            "WHERE patient_id = %s RETURNING last_seq_no) "
+            "INSERT INTO outbox_events (event_id, routing_key, priority, payload) "
+            "SELECT %s, %s, %s, jsonb_set(jsonb_set(%s::jsonb, '{patient_seq_no}', to_jsonb(p.last_seq_no)), "
+            "'{occurred_at}', to_jsonb(clock_timestamp())) FROM p RETURNING event_id",
+            args + [patient_id, event_id, etype, priority, json.dumps(envelope)])
+        if cur.fetchone() is None:
+            raise RuntimeError(f"add_event: unknown patient {patient_id}")
+    else:
+        cur.execute(
+            "INSERT INTO outbox_events (event_id, routing_key, priority, payload) "
+            "VALUES (%s, %s, %s, jsonb_set(%s::jsonb, '{occurred_at}', to_jsonb(clock_timestamp())))",
+            (event_id, etype, priority, json.dumps(envelope)))
     return event_id
 
 

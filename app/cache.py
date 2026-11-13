@@ -6,8 +6,8 @@ Rules (DECISIONS C15):
   caller read from PostgreSQL, so both must agree before Lua touches any key.
 - Any Redis failure seen by any process marks the shared state DEGRADED (conditional update).
 - One worker at a time (advisory lock) rebuilds into a NEW generation namespace mg:<gen>:..., then does the
-  final reconciliation while holding the pg_epoch row lock. Every availability write bumps pg_epoch as its
-  last statement, so no allocation can commit between the final read and the READY switch.
+  final reconciliation while holding advisory lock EPOCH_FENCE exclusively. Every availability write takes it
+  shared as its last statement, so no allocation can commit between the final read and the READY switch.
 """
 import json
 import threading
@@ -46,6 +46,9 @@ def fast_path_generation():
     except Exception:  # noqa: BLE001
         return None
     if st != READY or not rds.breaker.allow():
+        return None
+    from . import faults
+    if faults.get("fault:force_sql") == "1":  # test hook (CHAOS_ENABLED only): compare SQL-only results
         return None
     return gen
 
@@ -141,9 +144,9 @@ def rebuild(actor):
             with c.cursor() as cur:
                 counts = _load_snapshot(r, gen, cur)
             c.commit()
-        # 2) fenced switch: hold pg_epoch row lock, re-read authoritative state, reconcile, publish pointer.
+        # 2) fenced switch: exclusive fence lock, re-read authoritative state, reconcile, publish pointer.
         def fenced(cur):
-            cur.execute("SELECT value FROM system_state WHERE key='pg_epoch' FOR UPDATE")
+            cur.execute("SELECT pg_advisory_xact_lock(%s)", (db.EPOCH_FENCE,))
             cur.execute("SELECT value FROM system_state WHERE key='cache_generation' FOR UPDATE")
             if cur.fetchone()["value"] != gen:
                 raise RuntimeError("generation moved during rebuild")

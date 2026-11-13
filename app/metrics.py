@@ -37,9 +37,8 @@ def _flusher():
             continue
         try:
             with db.pool().connection() as conn:
-                with conn.cursor() as cur:
+                with conn.transaction(), conn.cursor() as cur:
                     cur.executemany("INSERT INTO latency_samples (instance, op, path, ms) VALUES (%s,%s,%s,%s)", batch)
-                conn.commit()
         except Exception as e:  # noqa: BLE001
             log.warn("latency flush failed", error=str(e)[:200], dropped=len(batch))
 

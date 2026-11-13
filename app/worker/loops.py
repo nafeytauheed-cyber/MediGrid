@@ -9,7 +9,7 @@ from .. import beds, cache, config, db, log, mq, rds, transfers
 
 
 class OutboxPublisher(threading.Thread):
-    """Authoritative publication path. LISTEN wakes it at commit; a sweep every 250 ms is the fallback.
+    """Authoritative publication path: polls the partial index of PENDING rows every 50 ms.
     Rows are marked PUBLISHED only after a positive, routed confirm (DECISIONS C21)."""
 
     def __init__(self):
@@ -18,26 +18,15 @@ class OutboxPublisher(threading.Thread):
 
     def run(self):
         backoff = 0.5
-        listen = None
         while True:
             try:
-                if listen is None or listen.closed:
-                    listen = psycopg.connect(config.PG_DSN, autocommit=True)
-                    listen.execute("LISTEN outbox")
-                for _ in listen.notifies(timeout=0.25, stop_after=1):
-                    pass
                 while self.sweep() >= 100:
                     pass
                 backoff = 0.5
+                time.sleep(0.05)
             except Exception as e:  # noqa: BLE001
                 log.warn("outbox publisher error; backing off", error=str(e)[:200])
                 self.pub.close()
-                try:
-                    if listen is not None:
-                        listen.close()
-                except Exception:  # noqa: BLE001
-                    pass
-                listen = None
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 5)
 

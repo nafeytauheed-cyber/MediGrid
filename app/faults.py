@@ -1,21 +1,25 @@
 """Fault-injection flags stored in PostgreSQL control_flags (shared by every process).
 Only honoured when CHAOS_ENABLED=1."""
+import threading
 import time
 
 from . import config, db
 
 _cache = {"t": 0.0, "flags": {}}
+_lock = threading.Lock()
 
 
 def flags(max_age=0.5):
     if not config.CHAOS_ENABLED:
         return {}
     if time.monotonic() - _cache["t"] > max_age:
-        try:
-            _cache["flags"] = {r["key"]: r["value"] for r in db.query("SELECT key, value FROM control_flags")}
-            _cache["t"] = time.monotonic()
-        except Exception:  # noqa: BLE001
-            pass
+        with _lock:
+            if time.monotonic() - _cache["t"] > max_age:
+                try:
+                    _cache["flags"] = {r["key"]: r["value"] for r in db.query("SELECT key, value FROM control_flags")}
+                    _cache["t"] = time.monotonic()
+                except Exception:  # noqa: BLE001
+                    pass
     return _cache["flags"]
 
 

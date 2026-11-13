@@ -128,6 +128,10 @@ def _redis_search_rows(gen, condition, bed_type, lat, lon, radius):
 # ------------------------------------------------------------------ reserve
 
 def lookup(actor, key, lock=False):
+    if not lock:
+        return db.query_one("SELECT r.*, h.name AS hospital_name FROM reservations r JOIN hospitals h USING (hospital_id) "
+                            "WHERE r.actor_id=%s AND r.idempotency_key=%s", (actor, key))
+
     def _q(cur):
         if lock:
             cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"{actor}:{key}",))
@@ -172,45 +176,43 @@ def _raise_rate_limited(remaining_ms, path):
                    headers={"Retry-After": str(secs)})
 
 
-def _ttl_seconds(cur):
-    o = db.get_state(cur, "ttl_override_s")
-    return int(o) if o and o > 0 else config.DEFAULT_TTL_S
-
-
 def _commit(actor, q, reservation_id, bed_id=None, path="sql"):
     """The authoritative allocation transaction. Raises Duplicate, BedTaken, db.Conflict or ApiError."""
     params = {"cond": q["condition_code"], "bt": q["bed_type"], "lat": q["lat"], "lon": q["lon"],
               "r": q["radius_km"]}
 
     def tx(cur):
-        cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"{actor}:{q['idempotency_key']}",))
-        cur.execute("SELECT r.*, h.name AS hospital_name FROM reservations r JOIN hospitals h USING (hospital_id) "
-                    "WHERE r.actor_id=%s AND r.idempotency_key=%s", (actor, q["idempotency_key"]))
+        # 0. idempotency: lock on (actor, key), then look for a committed row (one round trip)
+        cur.execute("SELECT r.* FROM (SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))) l "
+                    "LEFT JOIN reservations r ON r.actor_id=%s AND r.idempotency_key=%s",
+                    (f"{actor}:{q['idempotency_key']}", actor, q["idempotency_key"]))
         prior = cur.fetchone()
-        if prior:
+        if prior and prior["reservation_id"]:
+            prior["hospital_name"] = smartmatch.catalog()["hospitals"][prior["hospital_id"]]["name"]
             raise Duplicate(prior)
-        # 1. patient lock (created on first sight)
-        cur.execute("INSERT INTO patients (patient_id, state) VALUES (%s, 'IN_TRANSIT') ON CONFLICT DO NOTHING",
-                    (q["patient_id"],))
-        cur.execute("SELECT * FROM patients WHERE patient_id=%s FOR UPDATE", (q["patient_id"],))
+        # 1. patient lock: the upsert takes the row lock (created on first sight) and reports an active hold
+        cur.execute("INSERT INTO patients (patient_id, state) VALUES (%s, 'IN_TRANSIT') ON CONFLICT (patient_id) "
+                    "DO UPDATE SET updated_at = patients.updated_at RETURNING patient_id, state, EXISTS (SELECT 1 FROM "
+                    "reservations WHERE patient_id=%s AND status='HELD' AND purpose='DISPATCH') AS has_hold",
+                    (q["patient_id"], q["patient_id"]))
         p = cur.fetchone()
         if p["state"] in ("ADMITTED", "TRANSFERRING"):
             raise db.Conflict(f"patient is {p['state']}", state={"patient": p}, code="PATIENT_NOT_ELIGIBLE")
-        cur.execute("SELECT reservation_id FROM reservations WHERE patient_id=%s AND status='HELD' AND purpose='DISPATCH'",
-                    (q["patient_id"],))
-        if cur.fetchone():
+        if p["has_hold"]:
             raise db.Conflict("patient already has an active dispatch hold", code="PATIENT_HAS_HOLD")
-        # 2. bed: conditional update, eligibility verified here against PostgreSQL
+        # 2. bed: the conditional update is the decision; eligibility is verified here against PostgreSQL
+        upd = ("UPDATE beds b SET status='RESERVED', reservation_id=%(rid)s, patient_id=%(pid)s, version=version+1, "
+               "updated_at=NOW() WHERE b.bed_id=%(bed)s AND b.status='FREE' AND b.bed_type=%(bt)s AND "
+               + smartmatch.ELIGIBLE_SQL.format(h="b.hospital_id") + " RETURNING bed_id, hospital_id, bed_type, version")
+        args = dict(params, rid=reservation_id, pid=q["patient_id"])
         if bed_id:
-            cur.execute("SELECT bed_id, version FROM beds b WHERE bed_id=%(bed)s AND status='FREE' AND bed_type=%(bt)s AND "
-                        + smartmatch.ELIGIBLE_SQL.format(h="b.hospital_id") + " FOR UPDATE",
-                        dict(params, bed=bed_id))
-            cand = cur.fetchone()
-            if not cand:
+            cur.execute(upd, dict(args, bed=bed_id))
+            bed = cur.fetchone()
+            if not bed:
                 raise BedTaken(bed_id)
         else:
             cur.execute(f"""
-              SELECT b.bed_id, b.version FROM beds b JOIN hospitals h ON h.hospital_id = b.hospital_id
+              SELECT b.bed_id FROM beds b JOIN hospitals h ON h.hospital_id = b.hospital_id
               WHERE b.status='FREE' AND b.bed_type=%(bt)s AND {smartmatch.ELIGIBLE_SQL.format(h='b.hospital_id')}
                 AND {smartmatch.HAVERSINE.format(t='h')} <= %(r)s
               ORDER BY {smartmatch.HAVERSINE.format(t='h')}, b.hospital_id, b.bed_id
@@ -218,40 +220,36 @@ def _commit(actor, q, reservation_id, bed_id=None, path="sql"):
             cand = cur.fetchone()
             if not cand:
                 raise ApiError(404, {"result": "NO_SUITABLE_HOSPITAL_OR_BED"})
-        cur.execute("UPDATE beds SET status='RESERVED', reservation_id=%s, patient_id=%s, version=version+1, "
-                    "updated_at=NOW() WHERE bed_id=%s AND status='FREE' AND version=%s "
-                    "RETURNING bed_id, hospital_id, bed_type, version",
-                    (reservation_id, q["patient_id"], cand["bed_id"], cand["version"]))
-        bed = cur.fetchone()
-        if not bed:
-            raise BedTaken(cand["bed_id"])
-        ttl = _ttl_seconds(cur)
+            cur.execute(upd, dict(args, bed=cand["bed_id"]))
+            bed = cur.fetchone()
+            if not bed:
+                raise BedTaken(cand["bed_id"])
+        # 3. reservation row; a unique violation aborts the whole transaction (no savepoint needed)
         try:
-            cur.execute("SAVEPOINT ins_res")
             cur.execute(
                 "INSERT INTO reservations (reservation_id, actor_id, idempotency_key, request_fingerprint, bed_id, "
                 "hospital_id, bed_type, ambulance_id, patient_id, priority, status, expires_at, purpose, "
-                "condition_code, alloc_path) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'HELD', "
-                "clock_timestamp() + make_interval(secs => %s), 'DISPATCH', %s, %s) RETURNING *",
+                "condition_code, alloc_path) SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'HELD', clock_timestamp() + "
+                "make_interval(secs => CASE WHEN s.value > 0 THEN s.value ELSE %s END), 'DISPATCH', %s, %s "
+                "FROM system_state s WHERE s.key='ttl_override_s' RETURNING *",
                 (reservation_id, actor, q["idempotency_key"], q["fingerprint"], bed["bed_id"], bed["hospital_id"],
-                 bed["bed_type"], q["ambulance_id"], q["patient_id"], q["priority"], ttl, q["condition_code"], path))
+                 bed["bed_type"], q["ambulance_id"], q["patient_id"], q["priority"], config.DEFAULT_TTL_S,
+                 q["condition_code"], path))
             res = cur.fetchone()
         except errors.UniqueViolation as e:
-            cur.execute("ROLLBACK TO SAVEPOINT ins_res")
             if "uq_res_one_active_per_bed" in str(e):
                 raise BedTaken(bed["bed_id"])
             raise db.Conflict("patient already has an active dispatch hold", code="PATIENT_HAS_HOLD")
-        cur.execute("UPDATE patients SET state='IN_TRANSIT', current_bed_id=NULL, current_hosp_id=NULL, updated_at=NOW() "
-                    "WHERE patient_id=%s", (q["patient_id"],))
+        # 4. outbox event + patient state in one statement, then the epoch fence
         db.add_event(cur, "bed.reservation.created",
                      {"reservation_id": str(reservation_id), "bed_id": bed["bed_id"], "hospital_id": bed["hospital_id"],
                       "bed_type": bed["bed_type"], "bed_version": bed["version"], "ambulance_id": q["ambulance_id"],
                       "condition_code": q["condition_code"], "expires_at": res["expires_at"].isoformat(),
                       "actor_id": actor, "alloc_path": path},
-                     patient_id=q["patient_id"], priority=q["priority"])
+                     patient_id=q["patient_id"], priority=q["priority"],
+                     patient_set={"state": "IN_TRANSIT", "current_bed_id": None, "current_hosp_id": None})
         db.bump_epoch(cur)
-        cur.execute("SELECT name FROM hospitals WHERE hospital_id=%s", (bed["hospital_id"],))
-        res["hospital_name"] = cur.fetchone()["name"]
+        res["hospital_name"] = smartmatch.catalog()["hospitals"][bed["hospital_id"]]["name"]
         return res
 
     row = db.run_tx(tx)

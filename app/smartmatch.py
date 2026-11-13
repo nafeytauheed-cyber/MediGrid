@@ -38,6 +38,8 @@ def catalog():
     if _cat["data"] and time.monotonic() - _cat["t"] < 10:
         return _cat["data"]
     with _lock:
+        if _cat["data"] and time.monotonic() - _cat["t"] < 10:
+            return _cat["data"]
         conds = {r["condition_code"]: {"label": r["label"], "required": [], "bed_types": []}
                  for r in db.query("SELECT condition_code, label FROM condition_catalog ORDER BY condition_code")}
         for r in db.query("SELECT condition_code, required_capability FROM condition_requirements ORDER BY 1,2"):
@@ -53,11 +55,21 @@ def catalog():
         return _cat["data"]
 
 
-def eligible_hospitals(condition_code):
-    """Authoritative read from PostgreSQL of hospitals holding every mandatory active capability."""
+_elig = {}
+
+
+def eligible_hospitals(condition_code, max_age=5.0):
+    """Hospitals holding every mandatory active capability, read from PostgreSQL and cached max_age seconds per
+    process. Used for search and to filter Lua candidates only: the allocation transaction re-verifies eligibility
+    with ELIGIBLE_SQL, so a stale entry can never make an ineligible hospital receive a booking."""
+    hit = _elig.get(condition_code)
+    if hit and time.monotonic() - hit[0] < max_age:
+        return hit[1]
     rows = db.query("SELECT h.hospital_id FROM hospitals h WHERE " + CAPS_SQL.format(h="h.hospital_id"),
                     {"cond": condition_code})
-    return {r["hospital_id"] for r in rows}
+    out = {r["hospital_id"] for r in rows}
+    _elig[condition_code] = (time.monotonic(), out)
+    return out
 
 
 def reason_text(cond, bed_type, dist_km, free):

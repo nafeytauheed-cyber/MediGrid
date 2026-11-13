@@ -28,6 +28,7 @@ class Hub:
         self.mode = None
         self.ambulances = None
         self.amb_sig = None
+        self.last_full = 0.0
         self.snapshot_cache = (0.0, None)
         self.stats = {"pubsub_msgs": 0, "watermark_repairs": 0, "batches": 0}
         self.started = False
@@ -75,8 +76,10 @@ class Hub:
             try:
                 st, gen = cache.read_state()
                 mode = cache.STATE_NAMES[st]
-                epoch = db.query_one("SELECT value FROM system_state WHERE key='pg_epoch'")["value"]
-                if epoch != self.epoch:
+                epoch = db.read_epoch()
+                # nextval() is visible before commit, so also re-read every 2 s regardless of the watermark
+                if epoch != self.epoch or time.monotonic() - self.last_full > 2.0:
+                    self.last_full = time.monotonic()
                     counts = self.read_counts()
                     changed = {h: c for h, c in counts.items() if self.counts.get(h) != c}
                     self.counts = counts
@@ -144,7 +147,7 @@ class Hub:
         if snap is not None and time.monotonic() - t < 1.0:
             return snap
         st, gen = cache.read_state()
-        epoch = db.query_one("SELECT value FROM system_state WHERE key='pg_epoch'")["value"]
+        epoch = db.read_epoch()
         snap = {"hospitals": self.read_counts(), "watermark": epoch, "mode": {"mode": cache.STATE_NAMES[st],
                                                                                "generation": gen},
                 "ambulances": self.ambulances, "instance": config.INSTANCE, "server_ts": time.time(),
