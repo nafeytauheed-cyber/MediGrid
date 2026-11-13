@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block body %}
-<h1>Operations</h1>
-<p id="ops-note" class="small muted">Refreshes every 2 s. Values that cannot be read show N/A with the reason. Operator identity required.</p>
+<div class="page-head"><h1>Operations</h1>
+<p id="ops-note" class="small muted">Refreshes every 2 s. Values that cannot be read show N/A with the reason. Operator identity required.</p></div>
 <div class="tiles" id="tiles" aria-live="polite"></div>
 <div class="grid2" style="margin-top:1rem">
   <section class="panel"><h2>Queues (RabbitMQ management API)</h2><div id="queues"></div></section>
@@ -14,9 +14,10 @@
   <section class="panel"><h2>Dead-letter queues</h2><p class="small muted">Inspection uses the management API with requeue, so viewing does not consume messages. Replay publishes with confirms before acking.</p><div id="dlq"></div></section>
   <section class="panel"><h2>Blocked patient streams</h2><div id="blocked"></div><h2>Fault flags</h2><div id="flags"></div></section>
 </div>
-<div class="chaosbar" aria-label="Judge chaos control bar">
+<section class="panel chaosbar" aria-label="Judge chaos control bar">
   <h2>Judge chaos control bar</h2>
+  <p class="muted small">Scenarios 1 to 4 run in the app (operator identity, CHAOS_ENABLED=1). Scenarios 5 and 6 need Docker commands.</p>
   <div class="scen" id="scen"></div>
-</div>
+</section>
 {% endblock %}
 {% block scripts %}<script src="/static/ops.js"></script>{% endblock %}

@@ -193,6 +193,19 @@ Routing 10,000 test events through the topic exchange would copy them into all f
 `condition_catalog` (labels, fail-closed lookup), `reservations.purpose/condition_code/alloc_path/updated_at`,
 `transfers_saga` idempotency columns, `outbox_events.published_at`, and operational tables in `db/002_operations.sql`.
 
+## D-MAP Control room map uses Leaflet with OpenStreetMap tiles (later change, requested by the project owner)
+- Context: the original prompt (C1) ruled out Leaflet and tile servers so the app works with no internet. The owner
+  then asked for a real map on the control room page.
+- Options: (a) keep the inline SVG schematic; (b) Leaflet 1.9.4 with OpenStreetMap tiles.
+- Choice: (b). Leaflet is self-hosted in `app/web/static/vendor/leaflet/` (no CDN at runtime); only map tiles come
+  from `tile.openstreetmap.org`.
+- Consequences: without internet the base map is blank. The page then shows a notice; hospital markers, live
+  counts, filters, selection and the hospital table keep working. The view is fitted once at load and live updates
+  only replace marker icons, so zoom and pan stay where the user left them. Load status keeps its shapes
+  (OK circle, LOW triangle, FULL square) plus text.
+- Tile usage: OpenStreetMap's tile policy allows light interactive use with attribution, which the map shows. A
+  public demo with many viewers should use another tile provider.
+
 ## Assumptions
 - A1 Hospital staff identity acts only on its own hospital; operator can act everywhere.
 - A2 Walk-in admission creates a CONFIRMED reservation with ambulance `WALK-IN`.

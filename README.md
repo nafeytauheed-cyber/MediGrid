@@ -18,7 +18,7 @@ double-allocated beds.
 - Hospital console: admit, discharge, transfer, confirm arrival; optimistic updates that roll back on 409; incoming
   transfer alerts with an accept countdown; keyboard navigation; connection indicator.
 - Transfer saga between hospitals: completes fully or is reversed on reject or timeout.
-- Live control-room map (inline SVG, no tiles), live over Server-Sent Events, with simulated ambulance positions.
+- Live control-room map (Leaflet, self-hosted, with OpenStreetMap tiles), live over Server-Sent Events, with simulated ambulance positions.
 - Operations page: events per second, queue depths, consumer lag, retries, DLQ with replay, search p95, free beds by
   type, invariants, cache state, and the judge chaos bar.
 - Four independent consumers (bed tracking, transfer saga, notifications, audit), each with its own queue, retry
@@ -133,6 +133,7 @@ laptop. Raw JSON in `results/`, step-by-step record in [docs/BUILD_LOG.md](docs/
 - SmartMatch rules and capability tags are synthetic and fixed at seed time; there is no capability edit API.
 - Interactive browser behaviour (keyboard navigation, rollback banner, countdowns, tablet layout) was built but not
   checked with browser automation; see docs/TRACEABILITY.md.
+- The map background needs internet (OpenStreetMap tiles). Offline, the page says so and markers, counts and the table still work.
 - All data is synthetic. Nothing here is clinical guidance.
 
 ## Repo layout

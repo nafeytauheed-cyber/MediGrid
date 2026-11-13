@@ -136,6 +136,12 @@ const MGX = (() => {
   function uuid() { return (crypto.randomUUID && crypto.randomUUID()) || (Date.now() + "-" + Math.random().toString(16).slice(2)); }
   const typeLabel = {ICU: "ICU", VENTILATOR: "VENT", GENERAL: "GEN"};
 
-  document.addEventListener("DOMContentLoaded", initIdentity);
+  function markNav() {
+    document.querySelectorAll(".top nav a").forEach((a) => {
+      const href = a.getAttribute("href");
+      if (location.pathname === href || location.pathname.startsWith(href + "/")) a.setAttribute("aria-current", "page");
+    });
+  }
+  document.addEventListener("DOMContentLoaded", () => { initIdentity(); markNav(); });
   return {$, esc, api, banner, meta, startLive, statusHtml, uuid, typeLabel, live};
 })();
