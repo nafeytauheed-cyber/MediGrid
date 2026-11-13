@@ -1,0 +1,62 @@
+{
+ "seconds": 40,
+ "load": {
+  "cycles": 972,
+  "errors": 0,
+  "status": {
+   "201": 972,
+   "429": 9745
+  }
+ },
+ "broker_down_observed": true,
+ "broker_restart_observed": true,
+ "broker_uptime_before_ms": 773853,
+ "broker_uptime_after_ms": 18333,
+ "peak_outbox_pending": 1234,
+ "drain_wait_s": 29.4,
+ "parity": {
+  "committed_events": 3888,
+  "outbox_pending": 0,
+  "groups": {
+   "bed_tracking": {
+    "expected": 3888,
+    "processed": 3888,
+    "dead_lettered": 0,
+    "unresolved": 0,
+    "unresolved_sample": []
+   },
+   "transfer_saga": {
+    "expected": 3888,
+    "processed": 3888,
+    "dead_lettered": 0,
+    "unresolved": 0,
+    "unresolved_sample": []
+   },
+   "notifications": {
+    "expected": 3888,
+    "processed": 3888,
+    "dead_lettered": 0,
+    "unresolved": 0,
+    "unresolved_sample": []
+   },
+   "audit": {
+    "expected": 3888,
+    "processed": 3888,
+    "dead_lettered": 0,
+    "unresolved": 0,
+    "unresolved_sample": []
+   }
+  },
+  "duplicate_inbox_rows_possible": false,
+  "pass": true
+ },
+ "invariants_ok": true,
+ "checks": {
+  "broker_restart_observed": true,
+  "outbox_drained": true,
+  "every_committed_event_processed_or_dlq_per_group": true,
+  "invariants_ok": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

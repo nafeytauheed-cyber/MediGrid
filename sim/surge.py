@@ -39,7 +39,11 @@ def main():
                 "lon": DEMO_POINT[1] + random.uniform(-0.1, 0.1), "idempotency_key": f"{tag}-{i}"}
         bar.wait()
         t0 = time.perf_counter()
-        r = clients[i].post("/api/dispatch/reserve", json=body)
+        try:
+            r = clients[i].post("/api/dispatch/reserve", json=body)
+        except Exception as e:  # noqa: BLE001  record client-side failures instead of dying
+            out[i] = (type(e).__name__, {}, (time.perf_counter() - t0) * 1000)
+            return
         out[i] = (r.status_code, r.json(), (time.perf_counter() - t0) * 1000)
         if r.status_code == 201:
             with lock:
@@ -128,6 +132,7 @@ def main():
         except Exception:  # noqa: BLE001
             pass
     allowed = {201, 404}
+    res["surge"]["client_exceptions"] = {k: v for k, v in codes.items() if isinstance(k, str)}
     res["checks"] = {
         "no_unexpected_statuses": set(codes) <= allowed,
         "duplicate_requests_replayed": res["duplicate_requests"]["replayed_same_reservation"] == len(dup),

@@ -1,0 +1,97 @@
+{
+ "search_redis": {
+  "path": "redis",
+  "first_match": "H-02",
+  "plain_nearest": {
+   "distance_km": 1.09,
+   "eligible": false,
+   "free": 5,
+   "hospital_id": "H-01",
+   "name": "North General Hospital (H-01)"
+  },
+  "h01_excluded_reason": "Excluded: missing CARDIAC_EMERGENCY_CARE"
+ },
+ "search_sql": {
+  "path": "sql",
+  "first_match": "H-02"
+ },
+ "reserve_sql": {
+  "alloc_path": "sql",
+  "hospital_id": "H-02",
+  "bed_id": "H-02-ICU-009"
+ },
+ "reserve_redis": {
+  "alloc_path": "redis",
+  "hospital_id": "H-02",
+  "bed_id": "H-02-ICU-022"
+ },
+ "no_match": {
+  "status": 404,
+  "result": "NO_SUITABLE_HOSPITAL_OR_BED",
+  "explanation": "No hospital within 50 km has all of: BURN_CARE and a free ICU bed. 2 hospital(s) city-wide hold the required capabilities. An operator may review a wider radius. Follow local clinical escalation protocols."
+ },
+ "bed_type_rejected": {
+  "status": 400,
+  "body": {
+   "condition_code": "CARDIAC_EMERGENCY",
+   "error": "BED_TYPE_NOT_PERMITTED",
+   "instance": "api-1",
+   "supported_bed_types": [
+    "GENERAL",
+    "ICU"
+   ]
+  }
+ },
+ "unknown_condition": {
+  "status": 400,
+  "error": "UNKNOWN_CONDITION"
+ },
+ "transfer_to_incapable": {
+  "status": 422,
+  "body": {
+   "detail": "H-01 lacks CARDIAC_EMERGENCY_CARE required for CARDIAC_EMERGENCY",
+   "error": "DESTINATION_NOT_CAPABLE",
+   "instance": "api-1",
+   "missing_capabilities": [
+    "CARDIAC_EMERGENCY_CARE"
+   ]
+  }
+ },
+ "concurrent_50": {
+  "created": 41,
+  "by_hospital": {
+   "H-04": 8,
+   "H-34": 8,
+   "H-17": 11,
+   "H-31": 8,
+   "H-21": 5,
+   "H-02": 1
+  },
+  "beds_distinct": 41,
+  "other_statuses": [
+   404,
+   404,
+   404,
+   404,
+   404,
+   404,
+   404,
+   404,
+   404
+  ]
+ },
+ "checks": {
+  "redis_search_picks_H02_not_H01": true,
+  "sql_search_identical": true,
+  "sql_reserve_H02": true,
+  "redis_reserve_H02": true,
+  "no_match_explicit": true,
+  "incompatible_bed_type_400": true,
+  "unknown_condition_400": true,
+  "transfer_destination_capability_checked": true,
+  "concurrent_only_capable_hospitals": true,
+  "concurrent_no_double_booking": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

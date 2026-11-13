@@ -1,0 +1,17 @@
+{
+ "reservation_id": "5f317447-d65c-418c-b53c-dafbeb30b103",
+ "bed_id": "H-01-GEN-048",
+ "hospital_id": "H-01",
+ "ttl_s": 10,
+ "db_expiry_to_free_s": 0.19,
+ "db_expiry_to_ui_batch_s": null,
+ "ui_note": "first SSE batch carrying that hospital with server_ts at or after the DB expiry time",
+ "sse_batches_seen": 0,
+ "sse_error": null,
+ "checks": {
+  "released_within_5s_of_expiry": true,
+  "ui_update_within_5s_of_expiry": false
+ },
+ "pass": false,
+ "status": "FAIL"
+}

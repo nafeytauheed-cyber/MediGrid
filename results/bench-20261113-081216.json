@@ -1,0 +1,79 @@
+{
+ "machine": {
+  "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "cpus_visible": 16,
+  "python": "3.12.8"
+ },
+ "note": "client-measured through the API (no nginx), alternating api-1/api-2; reserve holds are cancelled afterwards",
+ "rate_limit_note": "each simulated user sends at most n/concurrency requests",
+ "search_idle": {
+  "n": 200,
+  "ok": 200,
+  "errors": {},
+  "p50_ms": 4.01,
+  "p95_ms": 7.12,
+  "p99_ms": 8.2,
+  "max_ms": 10.4,
+  "wall_s": 0.8,
+  "throughput_rps": 236.6
+ },
+ "reserve_idle": {
+  "n": 100,
+  "ok": 100,
+  "errors": {},
+  "p50_ms": 16.65,
+  "p95_ms": 27.52,
+  "p99_ms": 42.22,
+  "max_ms": 42.2,
+  "arrival_rate_per_s": 10.0
+ },
+ "search_c300": {
+  "n": 1500,
+  "ok": 1500,
+  "errors": {},
+  "p50_ms": 242.39,
+  "p95_ms": 1539.93,
+  "p99_ms": 2427.61,
+  "max_ms": 2671.0,
+  "wall_s": 2.9,
+  "throughput_rps": 523.9
+ },
+ "reserve_c300": {
+  "n": 600,
+  "ok": 600,
+  "errors": {},
+  "p50_ms": 1226.62,
+  "p95_ms": 2480.53,
+  "p99_ms": 2998.78,
+  "max_ms": 3411.6,
+  "wall_s": 3.6,
+  "throughput_rps": 168.2
+ },
+ "search_open_300amb_every2s": {
+  "n": 3000,
+  "ok": 3000,
+  "errors": {},
+  "p50_ms": 6.34,
+  "p95_ms": 14.11,
+  "p99_ms": 23.8,
+  "max_ms": 95.4,
+  "arrival_rate_per_s": 150.0
+ },
+ "reserve_open_300amb_every10s": {
+  "n": 600,
+  "ok": 600,
+  "errors": {},
+  "p50_ms": 14.31,
+  "p95_ms": 26.52,
+  "p99_ms": 45.27,
+  "max_ms": 96.6,
+  "arrival_rate_per_s": 30.0
+ },
+ "checks": {
+  "search_p95_under_100ms_idle": true,
+  "search_p95_under_100ms_open_300_ambulances": true,
+  "search_p95_under_100ms_closed_loop_c300": false
+ },
+ "pass": false,
+ "status": "FAIL"
+}

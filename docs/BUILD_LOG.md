@@ -1,0 +1,43 @@
+# Build log
+
+Chronological. Times are UTC on 2026-11-13. Machine: Windows 11 Pro, Docker Desktop (WSL2 kernel 6.18), 16 logical
+CPUs, 16 GB RAM. Results JSON files are in `results/` (file name = scenario and time).
+Status: VERIFIED (ran it, saw the output), FAILED (ran it, it failed; fix follows), NOT RUN.
+
+| # | Time | Stage | What and why | Command | Result | Status |
+|---|---|---|---|---|---|---|
+| 1 | 07:40 | 0 | Check tooling before anything else | `docker version`, `docker compose version` | Docker 29.9.3, Compose v5.7.0, 16 CPUs, 16,069 MB RAM | VERIFIED |
+| 2 | 07:41 | 0 | Pin image tags that actually pull | `docker pull python:3.12.8-slim postgres:16.6 redis:7.4.1 rabbitmq:4.0.5-management nginx:1.27.3-alpine` | all five pulled | VERIFIED |
+| 3 | 07:42 | 0 | Pin packages that install and import | `pip install flask==3.1.0 gunicorn==23.0.0 redis==5.2.1 pika==1.3.2 psycopg[binary]==3.2.3 psycopg_pool==3.2.4 httpx==0.28.1 pytest==8.3.4` in the Python image, then import all | imports OK (flask 3.1.0, redis 5.2.1, pika 1.3.2, psycopg 3.2.3) | VERIFIED |
+| 4 | 07:48 | 0-1 | First `up`: migrations, seed, cache rebuild | `docker compose up -d` | 2 migrations; seed 40 hospitals, 4,597 beds, 1,655 occupied; cache READY gen 1 in 95.6 ms; all services healthy | VERIFIED |
+| 5 | 07:50 | 1 | Vertical slice through nginx | `python smoke.py` (urllib, host) | search via Redis 14.4 ms, H-02 first, plain nearest H-01 not eligible; reserve 201 `H-02-ICU-012` path redis; confirm 200; SEVERE_BURNS 404 NO_SUITABLE_HOSPITAL_OR_BED; 3 events applied in seq order 1,2,3 by all 4 groups | VERIFIED |
+| 6 | 07:53 | 5 | SmartMatch assertions | `docker compose run --rm tools python -m sim.smartmatch` | all 10 checks PASS; 50 concurrent cardiac: 50 beds at H-04/H-02/H-28/H-33, none at H-01 | VERIFIED |
+| 7 | 07:53 | 1 | Last-bed stampede, first run | `python -m sim.stampede` | correctness PASS (1 holder, 50 distinct beds, 0 duplicate rows, 429 with Retry-After 10); reserve p95 693.8 ms; search p95 130.5 ms | FAILED (search p95) |
+| 8 | 07:54 | 1 | Hypothesis: all writers queue on the `pg_epoch` row. Moved to a sequence plus advisory fence (D-EPOCH) | `003_epoch_sequence.sql`, rerun stampede | reserve p95 700.7 ms, search p95 123.2 ms: no change | FAILED (hypothesis wrong) |
+| 9 | 07:55 | 1 | Server-side samples | `SELECT ... FROM latency_samples` | redis-path reserve p50 197-534 ms under burst, SQL path uncontended p50 4 ms: contention, not the path | VERIFIED |
+| 10 | 07:56 | 1 | Hypothesis: `pg_notify` serialises commits. Removed it, publisher polls every 50 ms (D-NOTIFY) | rerun stampede | reserve p95 526.3 ms, search p95 126.8 ms | FAILED (small gain) |
+| 11 | 07:57 | 1 | Profile under 25 threads; fsync test | `prof.py`, `fsync.py` (scratch, tools container) | `run_tx` p50 133 ms; `SELECT 1` 1.05 ms per round trip; 25 parallel commits p50 28.8 ms with sync on, 24.4 ms with sync off: fsync is not the cause; round trips and a cold catalog-cache herd are | VERIFIED |
+| 12 | 07:58 | 1 | Cut round trips (D-RT): autocommit pool without per-checkout check, timeouts per connection, conditional UPDATE on the proposed bed, upsert patient lock, CTE for sequence+outbox, no savepoint; double-checked cache locks | rerun profile and stampede | `SELECT 1` 0.39 ms; stampede PASS: reserve p95 272.9 ms, search p95 76.9 ms | VERIFIED |
+| 13 | 07:59 | 3 | Expiry scenario, first run | `python -m sim.expiry` | DB released 0.07 s after expiry; UI batch not measured (watcher race) | FAILED (measurement) |
+| 14 | 08:00 | 3 | Fixed watcher; second run saw 0 SSE batches. `curl :8080/api/stream` returned 502: nginx kept the old IPs of recreated API containers | `curl -sN http://localhost:8080/api/stream` | 502 via nginx, 200 direct | FAILED |
+| 15 | 08:00 | 0 | nginx `resolver 127.0.0.11 valid=2s` + `zone` + `server ... resolve` (D-NGINX-DNS) | `nginx -t`, `nginx -s reload`, curl | syntax ok; stream via nginx works; favicon 200 | VERIFIED |
+| 16 | 08:00 | 3 | Expiry, third run | `python -m sim.expiry` | PASS: DB expiry to FREE 0.19 s, to UI batch 0.37 s | VERIFIED |
+| 17 | 08:00 | 2 | Flood then critical | `python -m sim.priority` | PASS: 0 consumers before fill, 10,001 confirmed in `q.transfer_saga` (fill 5.9 s), 1 consumer after resume, critical at position 1 | VERIFIED |
+| 18 | 08:01 | 2 | Poison and crash | `python -m sim.poison` | PASS: handler-error gaps 1.02 s, 2.92 s, 9.01 s then DLQ; crash before ack twice (worker exits 137, Docker restarts it), third delivery dead-lettered by guard; both replayed and processed once | VERIFIED |
+| 19 | 08:02 | 2 | Broker restart during admissions | `python -m sim.broker_restart --seconds 40` and `docker compose restart rabbitmq` at 12 s | PASS: restart observed (uptime 750,734 to 17,985 ms), outbox peak 1,441 pending, drained in 26.9 s, 3,880 committed events processed exactly once in each of 4 groups, 0 unresolved | VERIFIED |
+| 20 | 08:02 | 4 | Instance stop | `python -m sim.failover --phases A` and `docker compose stop api-1` | PASS: SSE resumed on api-2 0.38 s after the break; 43 health polls, 0 failures | VERIFIED |
+| 21 | 08:03 | 1 | Redis pause, first run | `--phases B` and `docker compose pause redis` / `unpause` | simulator bug: Decimal + float in load threads; result invalid | FAILED (simulator) |
+| 22 | 08:04 | 1 | Redis pause, rerun after fix | same | PASS: READY gen 2 to DEGRADED (5.2 s) to REBUILDING gen 3 (15.9 s) to READY gen 3 (16.2 s); 370 SQL-path and 499 Redis-path allocations; 0 duplicate rows; 19 cardiac requests while degraded, none to H-01 | VERIFIED |
+| 23 | 08:04 | 1 | Redis restart and injections | `--phases C,D` and `docker compose restart redis` | PASS: DEGRADED to READY gen 4 in 0.96 s; 139 SQL-path allocations; 0 duplicates; crash-after-hold 503 then retry allocated once and hold settled; ambiguous commit reconciled to 1 row | VERIFIED |
+| 24 | 08:05 | 5 | Surge, first run | `python -m sim.surge --ambulances 300 --crash` | simulator crashed on unhandled client exceptions | FAILED (simulator) |
+| 25 | 08:05 | 5 | Surge, second run | same | 11 of 300 requests: RemoteProtocolError/ReadError. Cause: gunicorn keep-alive 5 s closes connections clients reuse | FAILED |
+| 26 | 08:06 | 0 | gunicorn keep-alive 75 s, nginx upstream keep-alive 50 s (D-KEEPALIVE) | rerun surge | PASS: 300 requests, 268 x 201, 32 x 404 (explicit no-match), 0 errors; 30 duplicates replayed; 0 duplicate inbox rows; out-of-order applied 1,2,3 in all groups | VERIFIED |
+| 27 | 08:07 | 5 | Benchmark, first run | `python -m sim.bench --concurrency 300 --n 1500` | idle search p95 4.6 ms; 300 closed-loop search p95 773.7 ms; reserve at 300: 25 x 503 and 253 timeouts. Logs: pool timeouts, and PoolTimeout handled as "ambiguous commit" | FAILED |
+| 28 | 08:09 | 1 | Admission semaphore 16 per instance (D-ADMIT); PoolTimeout = not sent (D-POOLTIMEOUT); bench adds open-loop runs | rebuild | | VERIFIED (build) |
+| 29 | 08:10 | all | pytest | `docker compose run --rm tools python -m pytest -q tests` | 22 passed, then 28 passed after adding cache/MQ/SSE/SmartMatch tests | VERIFIED |
+| 30 | 08:12 | 5 | Benchmark, second run | same | idle search p95 7.1 ms, idle reserve p95 27.5 ms; 300 ambulances open loop (150 searches/s) p95 14.1 ms; 300 ambulances reserving every 10 s (30/s) p95 26.5 ms; 300 closed loop: 0 errors, search p95 1,539.9 ms, reserve p95 2,480.5 ms at 168 req/s | VERIFIED (closed-loop line FAILED) |
+| 31 | 08:13 | 4 | Page and asset checks | `curl` each page; `node --check` each JS file | /control /dispatch /hospital/H-01 /ops /favicon.ico /healthz all 200; JS syntax OK | VERIFIED |
+| 32 | - | 4 | Interactive browser checks (keyboard navigation, optimistic rollback banner, countdowns, 768 px layout) | manual | no browser automation in this environment | NOT RUN |
+| 33 | 08:13 | 5 | Final build: scenarios 1-4, SmartMatch, surge in sequence | `for s in smartmatch stampede priority expiry poison surge; do docker compose run --rm tools python -m sim.$s; done` | all PASS; stampede reserve p95 199.8 ms, search p95 76.0 ms; expiry 0.23 s to FREE, 0.24 s to UI; priority position 1 of 10,001 | VERIFIED |
+| 34 | 08:15 | 5 | Final build: scenario 5 | `sim.broker_restart --seconds 40` + `docker compose restart rabbitmq` | PASS: 3,888 committed events, outbox peak 1,234, drained in 29.4 s, 0 unresolved in all 4 groups | VERIFIED |
+| 35 | 08:17 | 5 | Final build: scenario 6 all phases | `sim.failover` + stop api-1, pause/unpause redis, restart redis | PASS: SSE resumed on api-2 in 0.62 s; pause: DEGRADED then READY gen 6, 392 SQL-path allocations, 0 duplicates; restart: READY gen 7 2.0 s after detection, 164 SQL-path allocations, 0 duplicates; injections PASS | VERIFIED |

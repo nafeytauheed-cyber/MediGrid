@@ -1,0 +1,64 @@
+{
+ "queue": "q.transfer_saga",
+ "routine": 10000,
+ "consumers_after_pause": 0,
+ "depth_before_fill": 0,
+ "fill_seconds": 6.0,
+ "depth_after_fill_confirmed": 10001,
+ "consumers_during_fill": 0,
+ "consumers_after_resume": 1,
+ "resumed_consumer": "worker-1",
+ "critical_event_id": "d4f6f0d3-d11d-40ed-912a-eba7a0705ae4",
+ "critical_position": 1,
+ "first_processed": [
+  {
+   "pos": 1,
+   "kind": "critical",
+   "event_id": "d4f6f0d3-d11d-40ed-912a-eba7a0705ae4",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.676948+00:00"
+  },
+  {
+   "pos": 2,
+   "kind": "routine",
+   "event_id": "4f675494-dc1c-4ec5-b0cc-893e505abd89",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.686417+00:00"
+  },
+  {
+   "pos": 3,
+   "kind": "routine",
+   "event_id": "28614d4d-db5d-4169-a208-aa1c9ac5cab7",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.693242+00:00"
+  },
+  {
+   "pos": 4,
+   "kind": "routine",
+   "event_id": "890f450b-fa44-4446-84dc-4a93dcb66bd4",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.699800+00:00"
+  },
+  {
+   "pos": 5,
+   "kind": "routine",
+   "event_id": "2ff82ac1-6d44-4249-b074-7487b0719de6",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.705783+00:00"
+  },
+  {
+   "pos": 6,
+   "kind": "routine",
+   "event_id": "2f43b1bc-a946-454e-b2a5-dffd055e6d21",
+   "consumer": "worker-1",
+   "at": "2026-11-13 08:13:08.710917+00:00"
+  }
+ ],
+ "checks": {
+  "all_consumers_stopped_before_fill": true,
+  "backlog_confirmed_in_same_queue": true,
+  "critical_processed_first": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

@@ -10,7 +10,7 @@ def run_api():
     class _App(BaseApplication):
         def load_config(self):
             for k, v in {"bind": "0.0.0.0:8000", "worker_class": "gthread", "workers": 1, "threads": 128,
-                         "timeout": 30, "keepalive": 5, "accesslog": None, "graceful_timeout": 3}.items():
+                         "timeout": 30, "keepalive": 75, "accesslog": None, "graceful_timeout": 3}.items():
                 self.cfg.set(k, v)
 
         def load(self):

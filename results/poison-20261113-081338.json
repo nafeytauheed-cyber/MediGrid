@@ -1,0 +1,57 @@
+{
+ "A_handler_error": {
+  "event_id": "c0613b0e-aa4d-4ebb-83f8-50eb96862e6a",
+  "group": "notifications",
+  "failures": 4,
+  "failure_times_s": [
+   0.11,
+   1.13,
+   4.07,
+   13.09
+  ],
+  "gaps_between_attempts_s": [
+   1.02,
+   2.94,
+   9.02
+  ],
+  "dead_lettered": true,
+  "visible_in_dlq": true
+ },
+ "B_crash_before_ack": {
+  "event_id": "20610fef-be22-4c87-8e4f-fc9c14bb7221",
+  "group": "audit",
+  "crashes": 3,
+  "dead_lettered": true,
+  "visible_in_dlq": true,
+  "note": "each crash is os._exit(137) of a whole worker before ack; Docker restarts it"
+ },
+ "fault_flag_removed_before_replay": true,
+ "replay": {
+  "A": {
+   "queue": "q.notifications.dlq",
+   "target": "q.notifications",
+   "replayed": [
+    "c0613b0e-aa4d-4ebb-83f8-50eb96862e6a"
+   ],
+   "left_in_dlq": 0
+  },
+  "B": {
+   "queue": "q.audit.dlq",
+   "target": "q.audit",
+   "replayed": [
+    "20610fef-be22-4c87-8e4f-fc9c14bb7221"
+   ],
+   "left_in_dlq": 0
+  },
+  "A_processed_after_replay": true,
+  "B_processed_after_replay": true
+ },
+ "checks": {
+  "A_three_retries_then_dlq": true,
+  "A_retry_delays_increase": true,
+  "B_redelivered_after_crash_then_dlq": true,
+  "replayed_and_processed_once": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

@@ -1,0 +1,64 @@
+{
+ "machine": {
+  "platform": "Linux-6.18.40.1-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "cpus_visible": 16,
+  "python": "3.12.8"
+ },
+ "note": "client-measured through the API (no nginx), alternating api-1/api-2; reserve holds are cancelled afterwards",
+ "rate_limit_note": "each simulated user sends at most n/concurrency requests",
+ "search_idle": {
+  "n": 200,
+  "ok": 200,
+  "errors": {},
+  "p50_ms": 2.84,
+  "p95_ms": 4.63,
+  "p99_ms": 5.89,
+  "max_ms": 7.1,
+  "wall_s": 0.6,
+  "throughput_rps": 331.9
+ },
+ "reserve_idle": {
+  "n": 100,
+  "ok": 20,
+  "errors": {
+   "429": 80
+  },
+  "p50_ms": 11.74,
+  "p95_ms": 26.87,
+  "p99_ms": 26.87,
+  "max_ms": 26.9,
+  "wall_s": 0.6,
+  "throughput_rps": 33.5
+ },
+ "search_c300": {
+  "n": 1500,
+  "ok": 1500,
+  "errors": {},
+  "p50_ms": 295.12,
+  "p95_ms": 773.65,
+  "p99_ms": 2185.54,
+  "max_ms": 2488.2,
+  "wall_s": 2.7,
+  "throughput_rps": 557.6
+ },
+ "reserve_c300": {
+  "n": 600,
+  "ok": 322,
+  "errors": {
+   "503": 25,
+   "ReadTimeout": 253
+  },
+  "p50_ms": 970.92,
+  "p95_ms": 1885.92,
+  "p99_ms": 2136.73,
+  "max_ms": 2227.1,
+  "wall_s": 30.6,
+  "throughput_rps": 10.5
+ },
+ "checks": {
+  "search_p95_under_100ms_idle": true,
+  "search_p95_under_100ms_c300": false
+ },
+ "pass": false,
+ "status": "FAIL"
+}

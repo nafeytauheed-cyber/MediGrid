@@ -1,5 +1,6 @@
 """Flask application: pages, JSON API and the SSE stream."""
 import json
+import os
 import threading
 import time
 import uuid
@@ -11,6 +12,11 @@ from ..dispatch import ApiError
 from .stream import hub
 
 ROLES = ("dispatcher", "hospital", "operator")
+# Admission control (DECISIONS D-ADMIT): at most ADMIT_MAX requests do database work at once per instance.
+# With 128 gunicorn threads and a 24-connection pool, unbounded concurrency made threads that held a connection
+# wait for the GIL behind all others, so transactions stretched and the pool starved (BUILD_LOG, bench run 1).
+ADMIT_MAX = int(os.environ.get("ADMIT_MAX", "16"))
+_admit = threading.BoundedSemaphore(ADMIT_MAX)
 
 
 def create_app():
@@ -37,6 +43,19 @@ def create_app():
 
     def body():
         return request.get_json(silent=True) or {}
+
+    @app.before_request
+    def _admission():
+        p = request.path
+        if p.startswith("/api/") and p != "/api/stream":
+            if not _admit.acquire(timeout=10):
+                return jsonify({"error": "BUSY", "retry_safe": True, "instance": config.INSTANCE}), 503, {"Retry-After": "1"}
+            request.environ["mg.admitted"] = True
+
+    @app.teardown_request
+    def _release(_exc):
+        if request.environ.pop("mg.admitted", False):
+            _admit.release()
 
     @app.after_request
     def _hdr(resp):

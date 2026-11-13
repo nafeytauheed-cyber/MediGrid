@@ -1,0 +1,148 @@
+{
+ "A_instance_stop": {
+  "stopped_instance": "api-1",
+  "stream_break_at": 1794557760.963884,
+  "resumed_on": "api-2",
+  "sse_resume_gap_s": 0.62,
+  "http_polls": {
+   "ok": 44,
+   "fail": 0,
+   "instances": {
+    "api-2": 40,
+    "api-1": 4
+   }
+  },
+  "note": "gap = stream break to first 'instance' event from the new instance (includes client retry delay)",
+  "checks": {
+   "sse_resumed_on_other_instance_within_5s": true
+  },
+  "pass": true
+ },
+ "B_redis_pause": {
+  "command": "docker compose pause redis ; wait 10 s ; docker compose unpause redis",
+  "states_seen": [
+   [
+    0.47,
+    "READY",
+    5
+   ],
+   [
+    5.74,
+    "DEGRADED",
+    5
+   ],
+   [
+    16.53,
+    "READY",
+    6
+   ]
+  ],
+  "start_generation": 5,
+  "ready_generation": 6,
+  "responses": {
+   "201": 753,
+   "404": 468,
+   "429": 540
+  },
+  "alloc_paths": {
+   "redis": 361,
+   "sql": 392
+  },
+  "cardiac_smartmatch": {
+   "ok": 43,
+   "wrong": 0,
+   "during_degraded": 0
+  },
+  "double_allocation_rows": 0,
+  "invariants_ok": true,
+  "checks": {
+   "degraded_observed": true,
+   "sql_path_used": true,
+   "fenced_rebuild_to_new_generation": true,
+   "zero_double_allocations": true,
+   "smartmatch_never_chose_incapable_H01": true
+  },
+  "pass": true
+ },
+ "C_redis_restart": {
+  "command": "docker compose restart redis",
+  "states_seen": [
+   [
+    0.53,
+    "READY",
+    6
+   ],
+   [
+    4.98,
+    "DEGRADED",
+    6
+   ],
+   [
+    6.68,
+    "REBUILDING",
+    7
+   ],
+   [
+    7.0,
+    "READY",
+    7
+   ]
+  ],
+  "start_generation": 6,
+  "ready_generation": 7,
+  "responses": {
+   "201": 591,
+   "404": 213,
+   "429": 79
+  },
+  "alloc_paths": {
+   "redis": 427,
+   "sql": 164
+  },
+  "cardiac_smartmatch": {
+   "ok": 43,
+   "wrong": 0,
+   "during_degraded": 0
+  },
+  "double_allocation_rows": 0,
+  "invariants_ok": true,
+  "checks": {
+   "degraded_observed": true,
+   "sql_path_used": true,
+   "fenced_rebuild_to_new_generation": true,
+   "zero_double_allocations": true,
+   "smartmatch_never_chose_incapable_H01": true
+  },
+  "pass": true
+ },
+ "D_injections": {
+  "crash_after_hold": {
+   "first_status": 503,
+   "first_error": "INJECTED_CRASH_AFTER_HOLD",
+   "retry_status": 201,
+   "reservations_for_key": 1,
+   "orphan_hold_settled_or_adopted": true
+  },
+  "ambiguous_commit": {
+   "status": 201,
+   "reconciled": true,
+   "reservations_for_key": 1
+  },
+  "checks": {
+   "crash_after_hold_returns_retry_safe_503": true,
+   "retry_after_crash_allocates_once": true,
+   "orphan_hold_settled": true,
+   "ambiguous_commit_reconciled_once": true,
+   "invariants_ok": true
+  },
+  "pass": true
+ },
+ "checks": {
+  "A_instance_stop": true,
+  "B_redis_pause": true,
+  "C_redis_restart": true,
+  "D_injections": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

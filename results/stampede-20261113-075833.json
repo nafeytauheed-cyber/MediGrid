@@ -1,0 +1,49 @@
+{
+ "last_bed": "H-01-ICU-001",
+ "requests": 50,
+ "instances_used": [
+  "api-1",
+  "api-2"
+ ],
+ "status_counts": {
+  "201": 50
+ },
+ "holders_of_last_bed_in_db": 1,
+ "responses_with_last_bed": 1,
+ "distinct_beds_given": 50,
+ "successful": 50,
+ "alloc_paths": {
+  "redis": 50
+ },
+ "double_allocation_rows": 0,
+ "others_rerouted_or_no_bed": true,
+ "reserve_ms": {
+  "p50": 208.26,
+  "p95": 272.92,
+  "max": 277.0
+ },
+ "search_ms": {
+  "n": 50,
+  "p50": 47.47,
+  "p95": 76.94
+ },
+ "rate_limit_check": {
+  "user": "ratelimit-6834de09",
+  "requests": 23,
+  "accepted": 20,
+  "rejected_429": 3,
+  "retry_after_header": "10",
+  "limit": "20/10s",
+  "got_429_with_retry_after": true
+ },
+ "checks": {
+  "exactly_one_holder_of_last_bed": true,
+  "no_bed_given_twice": true,
+  "invariant_query_empty": true,
+  "others_rerouted_or_no_bed": true,
+  "search_p95_under_100ms": true,
+  "rate_limit_429_with_retry_after": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

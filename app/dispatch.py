@@ -6,6 +6,7 @@ import uuid
 
 import psycopg
 from psycopg import errors
+from psycopg_pool import PoolTimeout
 
 from . import cache, config, db, faults, log, metrics, rds, smartmatch
 
@@ -341,6 +342,11 @@ def _lua_path(actor, q, gen, eligible, match_info):
         except Duplicate as d:
             cache.settle_hold(rid, gen, rec["bed_id"])
             return _dup_response(d.row, q)
+        except PoolTimeout:
+            # no connection was obtained, so nothing was sent: definitely not committed
+            cache.settle_hold(rid, gen, rec["bed_id"])
+            _forget_idemp(actor, key)
+            raise ApiError(503, {"error": "BUSY", "retry_safe": True, "idempotency_key": key}, {"Retry-After": "1"})
         except psycopg.OperationalError as e:
             return _ambiguous(actor, q, rid, gen, rec, e)
         except Exception:
@@ -424,6 +430,9 @@ def _sql_path(actor, q, match_info):
             raise ApiError(503, {"error": "CONTENTION", "retry_safe": True, "idempotency_key": q["idempotency_key"]})
     except Duplicate as d:
         return _dup_response(d.row, q)
+    except PoolTimeout:
+        raise ApiError(503, {"error": "BUSY", "retry_safe": True, "idempotency_key": q["idempotency_key"]},
+                       {"Retry-After": "1"})
     except psycopg.OperationalError as e:
         return _ambiguous(actor, q, rid, None, None, e)
     except ApiError as e:

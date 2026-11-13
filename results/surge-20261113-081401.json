@@ -1,0 +1,71 @@
+{
+ "surge": {
+  "ambulances": 300,
+  "wall_s": 1.87,
+  "status_counts": {
+   "201": 273,
+   "404": 27
+  },
+  "reserve_ms": {
+   "p50": 904.56,
+   "p95": 1685.09,
+   "p99": 1763.37
+  },
+  "paths": {
+   "redis": 271,
+   "sql": 2
+  },
+  "client_exceptions": {}
+ },
+ "duplicate_requests": {
+  "sent": 30,
+  "replayed_same_reservation": 30
+ },
+ "duplicate_deliveries": {
+  "republished": 50,
+  "notifications_before": 13084,
+  "notifications_after": 13217,
+  "note": "after - before counts only notifications for new surge/slow events, not duplicates",
+  "duplicate_inbox_rows": 0
+ },
+ "out_of_order": {
+  "patient_id": "sg57619-OOO",
+  "published_order": [
+   3,
+   2,
+   1
+  ],
+  "applied_order_by_group": {
+   "transfer_saga": [
+    1,
+    2,
+    3
+   ],
+   "notifications": [
+    1,
+    2,
+    3
+   ],
+   "audit": [
+    1,
+    2,
+    3
+   ],
+   "bed_tracking": [
+    1,
+    2,
+    3
+   ]
+  },
+  "postponed_counter_total": 2285
+ },
+ "checks": {
+  "no_unexpected_statuses": true,
+  "duplicate_requests_replayed": true,
+  "no_duplicate_inbox_rows": true,
+  "out_of_order_applied_in_order_every_group": true,
+  "invariants_ok": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

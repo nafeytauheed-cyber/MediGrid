@@ -1,0 +1,26 @@
+{
+ "A_instance_stop": {
+  "stopped_instance": "api-1",
+  "stream_break_at": 1794556961.8226793,
+  "resumed_on": "api-2",
+  "sse_resume_gap_s": 0.38,
+  "http_polls": {
+   "ok": 43,
+   "fail": 0,
+   "instances": {
+    "api-2": 38,
+    "api-1": 5
+   }
+  },
+  "note": "gap = stream break to first 'instance' event from the new instance (includes client retry delay)",
+  "checks": {
+   "sse_resumed_on_other_instance_within_5s": true
+  },
+  "pass": true
+ },
+ "checks": {
+  "A_instance_stop": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

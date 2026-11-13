@@ -1,0 +1,58 @@
+{
+ "B_redis_pause": {
+  "command": "docker compose pause redis ; wait 10 s ; docker compose unpause redis",
+  "states_seen": [
+   [
+    0.39,
+    "READY",
+    2
+   ],
+   [
+    5.18,
+    "DEGRADED",
+    2
+   ],
+   [
+    15.9,
+    "REBUILDING",
+    3
+   ],
+   [
+    16.22,
+    "READY",
+    3
+   ]
+  ],
+  "start_generation": 2,
+  "ready_generation": 3,
+  "responses": {
+   "201": 869,
+   "429": 629,
+   "404": 249
+  },
+  "alloc_paths": {
+   "redis": 499,
+   "sql": 370
+  },
+  "cardiac_smartmatch": {
+   "ok": 116,
+   "wrong": 0,
+   "during_degraded": 19
+  },
+  "double_allocation_rows": 0,
+  "invariants_ok": true,
+  "checks": {
+   "degraded_observed": true,
+   "sql_path_used": true,
+   "fenced_rebuild_to_new_generation": true,
+   "zero_double_allocations": true,
+   "smartmatch_never_chose_incapable_H01": true
+  },
+  "pass": true
+ },
+ "checks": {
+  "B_redis_pause": true
+ },
+ "pass": true,
+ "status": "PASS"
+}

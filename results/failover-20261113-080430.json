@@ -1,0 +1,81 @@
+{
+ "C_redis_restart": {
+  "command": "docker compose restart redis",
+  "states_seen": [
+   [
+    0.46,
+    "READY",
+    3
+   ],
+   [
+    5.17,
+    "DEGRADED",
+    3
+   ],
+   [
+    5.83,
+    "REBUILDING",
+    4
+   ],
+   [
+    6.13,
+    "READY",
+    4
+   ]
+  ],
+  "start_generation": 3,
+  "ready_generation": 4,
+  "responses": {
+   "201": 596,
+   "429": 139,
+   "404": 108
+  },
+  "alloc_paths": {
+   "redis": 457,
+   "sql": 139
+  },
+  "cardiac_smartmatch": {
+   "ok": 116,
+   "wrong": 0,
+   "during_degraded": 9
+  },
+  "double_allocation_rows": 0,
+  "invariants_ok": true,
+  "checks": {
+   "degraded_observed": true,
+   "sql_path_used": true,
+   "fenced_rebuild_to_new_generation": true,
+   "zero_double_allocations": true,
+   "smartmatch_never_chose_incapable_H01": true
+  },
+  "pass": true
+ },
+ "D_injections": {
+  "crash_after_hold": {
+   "first_status": 503,
+   "first_error": "INJECTED_CRASH_AFTER_HOLD",
+   "retry_status": 201,
+   "reservations_for_key": 1,
+   "orphan_hold_settled_or_adopted": true
+  },
+  "ambiguous_commit": {
+   "status": 201,
+   "reconciled": true,
+   "reservations_for_key": 1
+  },
+  "checks": {
+   "crash_after_hold_returns_retry_safe_503": true,
+   "retry_after_crash_allocates_once": true,
+   "orphan_hold_settled": true,
+   "ambiguous_commit_reconciled_once": true,
+   "invariants_ok": true
+  },
+  "pass": true
+ },
+ "checks": {
+  "C_redis_restart": true,
+  "D_injections": true
+ },
+ "pass": true,
+ "status": "PASS"
+}
