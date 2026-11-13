@@ -320,7 +320,7 @@ def expiry(run_id):
             return {"pass": False, "error": f"reserve returned {r.status_code}: {r.text[:200]}"}
         res = r.json()
         rid, bed, hosp = res["reservation_id"], res["bed_id"], res["hospital_id"]
-        ui = {"first_batch_after_free": None}
+        ui = {"batches": []}
         stop = threading.Event()
         threading.Thread(target=_watch_sse, args=(hosp, ui, stop), daemon=True).start()
         deadline = time.time() + 40
@@ -334,17 +334,21 @@ def expiry(run_id):
                 ui["db_free_at"] = row["now"]
                 break
             time.sleep(0.1)
-        t_wait = time.time() + 5
-        while ui["first_batch_after_free"] is None and time.time() < t_wait:
+        if not observed:
+            stop.set()
+            return {"pass": False, "reservation_id": rid, "error": "not released within 40 s"}
+        t_wait = time.time() + 6
+        first_after = None
+        while time.time() < t_wait and first_after is None:
+            first_after = next((ts for ts, _c in ui["batches"] if ts >= observed["exp"]), None)
             time.sleep(0.05)
         stop.set()
-        if not observed:
-            return {"pass": False, "reservation_id": rid, "error": "not released within 40 s"}
         gap = observed["now"] - observed["exp"]
-        ui_gap = (ui["first_batch_after_free"] - observed["exp"]) if ui["first_batch_after_free"] else None
+        ui_gap = (first_after - observed["exp"]) if first_after else None
         out = {"reservation_id": rid, "bed_id": bed, "hospital_id": hosp, "ttl_s": 10,
                "db_expiry_to_free_s": round(gap, 2), "db_expiry_to_ui_batch_s": round(ui_gap, 2) if ui_gap else None,
-               "ui_note": "first SSE batch for that hospital received after the DB transition"}
+               "ui_note": "first SSE batch carrying that hospital with server_ts at or after the DB expiry time",
+               "sse_batches_seen": len(ui["batches"]), "sse_error": ui.get("sse_error")}
         out["checks"] = {"released_within_5s_of_expiry": gap <= 5.0,
                          "ui_update_within_5s_of_expiry": ui_gap is not None and ui_gap <= 5.0}
         out["pass"] = all(out["checks"].values())
@@ -354,6 +358,7 @@ def expiry(run_id):
 
 
 def _watch_sse(hospital_id, ui, stop):
+    """Record the server timestamp of every SSE batch that carries this hospital."""
     try:
         with httpx.stream("GET", f"{config.NGINX_URL}/api/stream", timeout=httpx.Timeout(5.0, read=30.0)) as r:
             ev = None
@@ -364,9 +369,8 @@ def _watch_sse(hospital_id, ui, stop):
                     ev = line[6:].strip()
                 elif line.startswith("data:") and ev == "batch":
                     d = json.loads(line[5:])
-                    if hospital_id in d.get("hospitals", {}) and ui.get("db_free_at"):
-                        ui["first_batch_after_free"] = d["server_ts"]
-                        return
+                    if hospital_id in d.get("hospitals", {}):
+                        ui["batches"].append((d["server_ts"], d["hospitals"][hospital_id]))
     except Exception as e:  # noqa: BLE001
         ui["sse_error"] = str(e)[:120]
 

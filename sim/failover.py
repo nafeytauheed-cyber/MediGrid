@@ -126,7 +126,8 @@ def redis_phase(name, command_text):
     seen = []
     urls = chaos.bases()
     cardiac = {"ok": 0, "wrong": 0, "during_degraded": 0}
-    dp = db.query_one("SELECT 18.52 AS lat, 73.856 AS lon")
+    from app.seed import DEMO_POINT
+    dp = {"lat": DEMO_POINT[0], "lon": DEMO_POINT[1]}
 
     def load(i):
         c = chaos.client(urls[i % len(urls)], "dispatcher", f"{tag}-u{i}")
